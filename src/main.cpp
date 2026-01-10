@@ -1,4 +1,11 @@
 #include "main.h"
+#include "lemlib/api.hpp"
+
+pros::Controller controller(pros::E_CONTROLLER_MASTER);
+pros::MotorGroup leftMotors({-5, 4, -4}, pros::MotorGearset::blue);
+pros::MotorGroup rightMotors({6, -9, 7}, pros::MotorGearset::blue);
+int wheel_size = lemlib::Omniwheel::NEW_275;
+lemlib::Driveftrain drivetrain(&leftMotors, &rightMotors, 10, wheel_size, 360, 2);
 
 /**
  * A callback function for LLEMU's center button.
