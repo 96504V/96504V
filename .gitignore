@@ -15,3 +15,11 @@ temp.log
 temp.errors
 *.ini
 .d/
+build/
+.fw/
+*.bin
+*.elf
+
+# OS junk
+.DS_Store
+Thumbs.db
