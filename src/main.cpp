@@ -1,196 +1,103 @@
+#include "lemlib/api.hpp"
 #include "main.h"
+#include "pros/misc.h"
+#include "pros/motor_group.hpp"
 
 // Controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
-// Motor groups - using the ports from your original code
-pros::MotorGroup leftMotors({17, -13, 11}, pros::MotorGearset::blue);
-pros::MotorGroup rightMotors({15, 16, 10}, pros::MotorGearset::blue);
+// MotorGroups
+pros::MotorGroup leftMotors({5, 2, 12}, pros::MotorGearset::blue);
+pros::MotorGroup rightMotors({6, 11, 3}, pros::MotorGearset::blue);
+pros::MotorGroup intakeMotors({7, 8}, pros::MotorGearset::blue);
 
+// IMU and encoders
+pros::Imu imu(20);
+pros::Rotation horizontalEncoder(19);
+pros::Rotation verticalEncoder(18);
+
+// LEMLib pointers (will be initialized in initialize())
+lemlib::TrackingWheel* horizontal;
+lemlib::TrackingWheel* vertical;
+lemlib::Drivetrain* drivetrain;
+lemlib::Chassis* chassis;
+
+// Robot pose
+double heading;
+double x;
+double y;
+
+// Callback for LCD center button
+void on_center_button() {
+    static bool pressed = false;
+    pressed = !pressed;
+    if (pressed) {
+        heading = imu.get_heading();
+        x = chassis->getPose().x;
+        y = chassis->getPose().y;
+    } else {
+        pros::lcd::clear_line(2);
+    }
+}
+
+// Initialization
 void initialize() {
-	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Basic Drive Test");
+    pros::lcd::initialize();
+
+    // Reverse left motors
+    // leftMotors.set_reversed(true);
+
+    // Create tracking wheels
+    horizontal = new lemlib::TrackingWheel(&horizontalEncoder, 2.75, -5.75);
+    vertical = new lemlib::TrackingWheel(&verticalEncoder, 2.75, -2.5);
+
+    // Create drivetrain
+    drivetrain = new lemlib::Drivetrain(&leftMotors, &rightMotors, 10, 2.75, 450, 2);
+
+    // Controller settings
+    lemlib::ControllerSettings linearController(10, 0, 3, 3, 1, 100, 3, 500, 20);
+    lemlib::ControllerSettings angularController(2, 0, 10, 3, 1, 100, 3, 500, 0);
+
+    // Sensors for odometry
+    lemlib::OdomSensors sensors(vertical, nullptr, horizontal, nullptr, &imu);
+
+    // Input curves
+    lemlib::ExpoDriveCurve throttleCurve(3, 10, 1.019);
+    lemlib::ExpoDriveCurve steerCurve(3, 10, 1.019);
+
+    // Create chassis
+    chassis = new lemlib::Chassis(*drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
+
+    // Calibrate chassis
+    chassis->calibrate(false);
+
+    // Register LCD callback
+    pros::lcd::register_btn1_cb(on_center_button);
 }
 
 void disabled() {}
 
 void competition_initialize() {}
 
-void autonomous() {
-	// Empty for now - just testing driver control
-}
+void autonomous() {}
 
 void opcontrol() {
-	while (true) {
-		// Arcade control scheme
-		int forward = controller.get_analog(ANALOG_LEFT_Y);   // Forward/backward
-		int turn = controller.get_analog(ANALOG_RIGHT_X);     // Turn left/right
-		
-		// Calculate motor powers
-		int left = forward + turn;
-		int right = forward - turn;
-		
-		// Move the motors
-		leftMotors.move(left);
-		rightMotors.move(right);
-		
-		// Display joystick values on controller screen (optional)
-		controller.print(0, 0, "L:%d R:%d", left, right);
-		
-		pros::delay(20);  // Don't hog the CPU
-	}
+    while (true) {
+        // Arcade drive
+        chassis->arcade(
+            controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y),
+            controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X)
+        );
+
+        // Intake control
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+            intakeMotors.move(127);
+        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
+            intakeMotors.move(-127);
+        } else {
+            intakeMotors.move(0);
+        }
+
+        pros::delay(20);
+    }
 }
-// #include "main.h"
-// #include "lemlib/api.hpp"
-
-// pros::Controller controller(pros::E_CONTROLLER_MASTER);
-// pros::MotorGroup leftMotors({-5, 4, -4}, pros::MotorGearset::blue);
-// pros::MotorGroup rightMotors({6, -9, 7}, pros::MotorGearset::blue);
-// int wheel_size = lemlib::Omniwheel::NEW_275;
-// pros::Imu imu(4);
-// pros::Rotation horizontalEncoder(2);
-// pros::Rotation verticalEncoder(1);
-// lemlib::TrackingWheel horizontal(&horizontalEncoder, wheel_size, -5.75);
-// lemlib::TrackingWheel vertical(&verticalEncoder, wheel_size, -2.5);
-// lemlib::Drivetrain drivetrain(&leftMotors, &rightMotors, 10, wheel_size, 450, 2);
-
-
-// // lateral motion controller
-// lemlib::ControllerSettings linearController(10, // proportional gain (kP)
-//                                             0, // integral gain (kI)
-//                                             3, // derivative gain (kD)
-//                                             3, // anti windup
-//                                             1, // small error range, in inches
-//                                             100, // small error range timeout, in milliseconds
-//                                             3, // large error range, in inches
-//                                             500, // large error range timeout, in milliseconds
-//                                             20 // maximum acceleration (slew)
-// );
-
-// // angular motion controller
-// lemlib::ControllerSettings angularController(2, // proportional gain (kP)
-//                                              0, // integral gain (kI)
-//                                              10, // derivative gain (kD)
-//                                              3, // anti windup
-//                                              1, // small error range, in degrees
-//                                              100, // small error range timeout, in milliseconds
-//                                              3, // large error range, in degrees
-//                                              500, // large error range timeout, in milliseconds
-//                                              0 // maximum acceleration (slew)
-// );
-
-// // sensors for odometry
-// lemlib::OdomSensors sensors(&vertical, // vertical tracking wheel
-//                             nullptr, // vertical tracking wheel 2, set to nullptr as we don't have a second one
-//                             &horizontal, // horizontal tracking wheel
-//                             nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
-//                             nullptr // inertial sensor
-// );
-
-// // input curve for throttle input during driver control
-// lemlib::ExpoDriveCurve throttleCurve(3, // joystick deadband out of 127
-//                                      10, // minimum output where drivetrain will move out of 127
-//                                      1.019 // expo curve gain
-// );
-
-// // input curve for steer input during driver control
-// lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
-//                                   10, // minimum output where drivetrain will move out of 127
-//                                   1.019 // expo curve gain
-// );
-
-// // create the chassis
-// lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
-
-// /**
-//  * A callback function for LLEMU's center button.
-//  *
-//  * When this callback is fired, it will toggle line 2 of the LCD text between
-//  * "I was pressed!" and nothing.
-//  */
-// void on_center_button() {
-// 	static bool pressed = false;
-// 	pressed = !pressed;
-// 	if (pressed) {
-// 		pros::lcd::set_text(2, "I was pressed!");
-// 	} else {
-// 		pros::lcd::clear_line(2);
-// 	}
-// }
-
-// /**
-//  * Runs initialization code. This occurs as soon as the program is started.
-//  *
-//  * All other competition modes are blocked by initialize; it is recommended
-//  * to keep execution time for this mode under a few seconds.
-//  */
-// void initialize() {
-// 	pros::lcd::initialize();
-// 	pros::lcd::set_text(1, "Hello PROS User!");
-
-// 	pros::lcd::register_btn1_cb(on_center_button);
-// }
-
-// /**
-//  * Runs while the robot is in the disabled state of Field Management System or
-//  * the VEX Competition Switch, following either autonomous or opcontrol. When
-//  * the robot is enabled, this task will exit.
-//  */
-// void disabled() {}
-
-// /**
-//  * Runs after initialize(), and before autonomous when connected to the Field
-//  * Management System or the VEX Competition Switch. This is intended for
-//  * competition-specific initialization routines, such as an autonomous selector
-//  * on the LCD.
-//  *
-//  * This task will exit when the robot is enabled and autonomous or opcontrol
-//  * starts.
-//  */
-// void competition_initialize() {}
-
-// /**
-//  * Runs the user autonomous code. This function will be started in its own task
-//  * with the default priority and stack size whenever the robot is enabled via
-//  * the Field Management System or the VEX Competition Switch in the autonomous
-//  * mode. Alternatively, this function may be called in initialize or opcontrol
-//  * for non-competition testing purposes.
-//  *
-//  * If the robot is disabled or communications is lost, the autonomous task
-//  * will be stopped. Re-enabling the robot will restart the task, not re-start it
-//  * from where it left off.
-//  */
-// void autonomous() {}
-
-// /**
-//  * Runs the operator control code. This function will be started in its own task
-//  * with the default priority and stack size whenever the robot is enabled via
-//  * the Field Management System or the VEX Competition Switch in the operator
-//  * control mode.
-//  *
-//  * If no competition control is connected, this function will run immediately
-//  * following initialize().
-//  *
-//  * If the robot is disabled or communications is lost, the
-//  * operator control task will be stopped. Re-enabling the robot will restart the
-//  * task, not resume it from where it left off.
-//  */
-// void opcontrol() {
-// 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-// 	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
-// 	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
-
-
-// 	while (true) {
-// 		pros::lcd::print(0, "%d %d %d", (pros::lcd::read_buttons() & LCD_BTN_LEFT) >> 2,
-// 		                 (pros::lcd::read_buttons() & LCD_BTN_CENTER) >> 1,
-// 		                 (pros::lcd::read_buttons() & LCD_BTN_RIGHT) >> 0);  // Prints status of the emulated screen LCDs
-
-// 		// Arcade control scheme
-// 		int dir = master.get_analog(ANALOG_LEFT_Y);    // Gets amount forward/backward from left joystick
-// 		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
-// 		left_mg.move(dir - turn);                      // Sets left motor voltage
-// 		right_mg.move(dir + turn);                     // Sets right motor voltage
-// 		pros::delay(20);                               // Run for 20 ms then update
-// 	}
-// }
