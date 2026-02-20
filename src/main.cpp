@@ -28,6 +28,49 @@ bool clearing = false; // tracks whether the wing mech is down or up
  * A callback function for LLEMU's center button.
  */
 
+void load(int  y) {
+	for (int i = 0; i < 100; i++) {
+		intake.move(127);
+		chassis.moveToPoint(0, y - 1, 100);
+		chassis.moveToPoint(0, y, 100);
+	}
+}
+
+void unload() {
+	for (int i = 0; i < 100; i++) {
+		intake.move(-127);
+		score.move(127);
+	}
+}
+
+void skillsAuton() {
+	chassis.moveToPose(0, 15, 90, 100, {.maxSpeed = 60});
+	chassis.setPose(0, 0, 0);
+	chassis.moveToPoint(0, 5, 100, {.maxSpeed = 60});
+	load(5);
+	chassis.moveToPoint(0, -5, 100, {.maxSpeed = 60});
+	unload();
+	chassis.moveToPoint(0, 0, 100, {.maxSpeed = 60});
+	chassis.turnToHeading(-135, 100);
+	chassis.setPose(0, 0, 0);
+	chassis.moveToPose(0, 10, 45, 100, {.maxSpeed = 60});
+	chassis.setPose(0, 0, 0);
+	chassis.moveToPose(0, 20, 45, 100, {.maxSpeed = 60});
+	chassis.turnToHeading(90, 100);
+	chassis.setPose(0, 0, 0);
+	chassis.moveToPoint(0, -7, 100);
+	unload();
+	chassis.moveToPoint(0, 5, 100);
+	load(5);
+	chassis.moveToPoint(0, -7, 100);
+	unload();
+	chassis.moveToPose(0, 0, 90, 100);
+	loading = !loading;
+	loader.set_value(loading);
+	chassis.setPose(0, 0, 0);
+	chassis.moveToPoint(0, 30, 100);
+}
+
 void on_center_button() {
 	static bool pressed = false;
 	pressed = !pressed;
